@@ -1,0 +1,121 @@
+version: '3'
+services:
+
+  portainer:
+    container_name: 'portainer'
+    image: 'portainer/portainer'
+    volumes:
+      - ./volumes/portainer:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+
+   #MySQL instance for Home Assistant
+   # mysql:
+     # container_name: 'mysql'
+     # image: 'hypriot/rpi-mysql'
+     # volumes:
+        # - ${DOCKERDIR}/mysql:/var/lib/mysql
+     # ports:
+       # - "3306:3306"
+     # restart: unless-stopped
+     # environment:
+       # MYSQL_ROOT_PASSWORD: 'ha'
+       # MYSQL_DATABASE: 'ha'
+       # MYSQL_USER: 'ha'
+       # MYSQL_PASSWORD: 'ha'
+
+   #MySQL instance for Zoneminder
+   # mysql_zm:
+     # container_name: 'mysql_zm'
+     # image: 'hypriot/rpi-mysql'
+     # volumes:
+        # - ${DOCKERDIR}/mysql_zm:/var/lib/mysql
+     # ports:
+       # - "3308:3306"
+     # restart: unless-stopped
+     # environment:
+       # MYSQL_ROOT_PASSWORD: 'zm'
+       # MYSQL_DATABASE: 'zm'
+       # MYSQL_USER: 'zm'
+       # MYSQL_PASSWORD: 'zm'
+
+  # influxdb:
+    # container_name: 'influxdb'
+    # image: 'hypriot/rpi-influxdb'
+    # restart: unless-stopped
+    # volumes:
+      # - ${DOCKERDIR}/influxdb_ha/influxdb.conf:/etc/influxdb/influxdb.conf:ro
+      # - ${DOCKERDIR}/influxdb_ha/db:/var/lib/influxdb
+    # environment:
+      # - INFLUX_GRAPHITE_ENABLED='true'
+      # - ADMIN_USER='root'
+      # - INFLUXDB_INIT_PWD='ha'
+    # ports:
+      # - "8086:8086"
+
+  homeassistant:
+    container_name: homeassistant
+    image: 'homeassistant/raspberrypi3-homeassistant:0.66.0.beta1'
+    restart: unless-stopped
+    # depends_on:
+      # - influxdb
+      # - mysql
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0
+    volumes:
+      - ./volumes/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - ./volumes/homeassistant/media:/media
+    network_mode: host
+    ports:
+      - "8123:8123"
+    privileged: true
+
+  zoneminder:
+    container_name: 'zoneminder'
+    image: 'koenkk/rpi-zoneminder'
+    restart: unless-stopped
+    volumes:
+      - ./volumes/zoneminder/config:/config:rw
+      - ./volumes/zoneminder/data:/var/cache/zoneminder:rw
+    environment:
+      - TZ='America/New_York'
+    ports:
+      - "8124:80"
+
+
+  nginx-proxy:
+    container_name: 'nginx-proxy'
+    image: 'jwilder/nginx-proxy'
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./volumes/nginx/certs:/etc/nginx/certs:ro
+      - ./volumes/nginx/vhost.d:/etc/nginx/vhost.d
+      - ./volumes/nginx/share:/usr/share/nginx/html
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+
+  whoami:
+    container_name: 'whoami'
+    image: jwilder/whoami
+    environment:
+      - VIRTUAL_HOST=40513.duckdns.org
+      - LETSENCRYPT_HOST=40513.duckdns.org
+      - LETSENCRYPT_EMAIL=captainkrypto@gmail.com
+    restart: unless-stopped
+
+  letsencrypt-nginx-proxy-companion:
+    container_name: 'letsencrypt-nginx-proxy-companion'
+    image: 'jrcs/letsencrypt-nginx-proxy-companion'
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./volumes/nginx/certs:/etc/nginx/certs:ro
+      - ./volumes/nginx/vhost.d:/etc/nginx/vhost.d
+      - ./volumes/nginx/share:/usr/share/nginx/html
+    restart: unless-stopped
