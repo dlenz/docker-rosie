@@ -1,1 +1,1 @@
-# Rosie-docker config
+# docker config for rosie rpi
